@@ -2,13 +2,46 @@ name: CI
 
 on:
   push:
-    branches: [main, master, development]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install libdbus (Linux keyring backend)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
+      - name: Build release binary
+        run: cargo build --locked --release --bin sshub
+      - name: Smoke-test the built binary
+        run: ./target/release/sshub --version
+      - name: Package binary
+        env:
+          ARCHIVE_NAME: sshub-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}.tar.gz
+        run: tar -czf "$ARCHIVE_NAME" -C target/release sshub
+      - name: Upload binary
+        uses: actions/upload-artifact@v7
+        with:
+          name: sshub-${{ runner.os }}-${{ runner.arch }}
+          path: sshub-*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
   # Enforces AGENTS.md § Branch naming, which was prose only until a bug fix
   # shipped on a `feature/` branch and nothing objected. Skipped for forks: a
   # contributor's branch name is not ours to police.

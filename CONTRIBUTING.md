@@ -5,9 +5,18 @@ Thanks for your interest in contributing. Here's how to get started.
 ## Getting started
 
 1. Fork and clone the repo
-2. Install Rust (edition 2021) and `just` (optional, for running the full test suite)
+2. Install current stable Rust and `just` (optional, for running the full test suite)
 3. Run `cargo build` to verify everything compiles
 4. Run `just test` (or `cargo test`) to confirm tests pass
+
+## Automated builds
+
+The `CI` workflow runs on every branch and tag push, on pull requests, and
+manually from the Actions tab. It builds release binaries with the committed
+`Cargo.lock` and default features on Linux and macOS, checks `sshub --version`,
+and uploads a tarball for each platform. Download these from the run's
+**Artifacts** section within seven days. Tests and lint checks run alongside
+the builds. The tag-triggered `Release` workflow handles publishing separately.
 
 ## Branch model
 
