@@ -283,6 +283,11 @@ impl App {
             form.dirty = true;
             return;
         }
+        if form.field == HostFormField::LegacySsh {
+            form.legacy_ssh = !form.legacy_ssh;
+            form.dirty = true;
+            return;
+        }
         if form.field == HostFormField::Transport {
             form.transport = match form.transport {
                 None => Some(crate::session_transport::SessionTransport::Ssh),

@@ -72,6 +72,11 @@ fn map_os_release_id(id: &str, id_like: Option<&str>) -> Option<CanonicalOs> {
         "freebsd" => Some("freebsd"),
         "macos" => Some("macos"),
         "windows" => Some("windows"),
+        "openwrt" => Some("openwrt"),
+        // Oracle Linux ships `ID=ol`; accept the longer forms too.
+        "ol" | "oracle" | "oraclelinux" => Some("oracle"),
+        // Proxmox VE is usually `ID=debian`; this catches a dedicated id if set.
+        "proxmox" | "pve" => Some("proxmox"),
         s if s.starts_with("opensuse") => Some("opensuse"),
         _ => None,
     };
@@ -184,8 +189,24 @@ mod tests {
 
     #[test]
     fn almalinux_keeps_own_id() {
-        // almalinux has no logo but still maps to a canonical id string.
         assert_eq!(parse_os("ID=almalinux\n"), Some("almalinux"));
+    }
+
+    #[test]
+    fn openwrt_keeps_own_id() {
+        assert_eq!(parse_os("ID=openwrt\n"), Some("openwrt"));
+    }
+
+    #[test]
+    fn oracle_linux_aliases() {
+        assert_eq!(parse_os("ID=ol\n"), Some("oracle"));
+        assert_eq!(parse_os("ID=oraclelinux\n"), Some("oracle"));
+    }
+
+    #[test]
+    fn proxmox_aliases() {
+        assert_eq!(parse_os("ID=proxmox\n"), Some("proxmox"));
+        assert_eq!(parse_os("ID=pve\n"), Some("proxmox"));
     }
 
     #[test]

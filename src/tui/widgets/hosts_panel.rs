@@ -653,6 +653,7 @@ mod tests {
                 session_logging: crate::session_log::SessionLoggingOverride::Inherit,
                 ping: crate::session_log::SessionLoggingOverride::Inherit,
                 transport: Default::default(),
+                legacy_ssh: false,
                 created_at: 0,
                 updated_at: 0,
             },

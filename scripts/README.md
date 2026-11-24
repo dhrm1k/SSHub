@@ -14,7 +14,10 @@ sshub ships two vendored logo sets, both keyed by the canonical distro ids in
   `src/osinfo/logos.rs`). No script is checked in for this set.
 - **Large full-colour** — `assets/os_logos_large.json`, used by the *zoomed*
   host-detail panel (`z` on the Hosts dashboard). Generated from
-  [fastfetch](https://github.com/fastfetch-cli/fastfetch)'s built-in logos.
+  [fastfetch](https://github.com/fastfetch-cli/fastfetch)'s built-in logos
+  (`scripts/gen_os_logos.py`). Ids with no fastfetch source (`docker`,
+  `github`, `bitbucket`) are hand-maintained in that JSON and preserved on
+  regenerate.
 
 ### Regenerating the large logos
 

@@ -128,7 +128,7 @@ pub const HELP_ITEMS: &[HelpItem] = &[
         desc: "Zoom: widen / narrow the hosts column",
     },
     HelpItem::Entry {
-        key: "Alt+\u{2190}\u{2192}\u{2191}\u{2193}",
+        key: "Alt+Shift+\u{2190}\u{2192}\u{2191}\u{2193}",
         desc: "Move dashboard panel focus",
     },
     HelpItem::Entry {
@@ -609,7 +609,7 @@ pub const HELP_ITEMS: &[HelpItem] = &[
         desc: "Run a command snippet (fuzzy pick; Enter runs, Tab inserts)",
     },
     HelpItem::Entry {
-        key: "Ctrl+[ / Ctrl+]",
+        key: "Ctrl+[ / Ctrl+] / Alt+←/→",
         desc: "Previous / next session tab",
     },
     HelpItem::Entry {

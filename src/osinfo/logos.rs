@@ -1,11 +1,12 @@
 //! Vendored, colorized OS logos.
 //!
-//! The logo art lives in `assets/os_logos.json` (21 canonical ids) and is
+//! The logo art lives in `assets/os_logos.json` (28 canonical ids) and is
 //! embedded at compile time via `include_str!`. Each logo is a block of
 //! Braille art (2x4 dots per cell) rendered from the official distro logo, plus
 //! one brand `color` (`[r, g, b]`) applied to the whole glyph. The art is built
-//! offline on the dev machine from the `font-logos` SVG set via
-//! `magick -alpha extract` + `chafa --symbols braille` (see the design spec).
+//! offline on the dev machine from SVG marks (font-logos / simple-icons) via
+//! alpha extract + Braille downsampling (historically `magick` + `chafa`; see
+//! the design spec).
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -63,10 +64,10 @@ fn build_logo(id: &'static str, raw: RawLogo) -> OsLogo {
     OsLogo { id, lines }
 }
 
-/// The 21 canonical logo ids, interned as `'static` literals so [`OsLogo::id`]
+/// The 28 canonical logo ids, interned as `'static` literals so [`OsLogo::id`]
 /// and the map keys share the same lifetime. Any id present in the JSON but not
 /// listed here is ignored; any id here but absent from the JSON is skipped.
-const CANONICAL_IDS: [&str; 21] = [
+const CANONICAL_IDS: [&str; 28] = [
     "arch",
     "ubuntu",
     "debian",
@@ -88,6 +89,13 @@ const CANONICAL_IDS: [&str; 21] = [
     "freebsd",
     "macos",
     "linux",
+    "openwrt",
+    "oracle",
+    "proxmox",
+    "docker",
+    "wsl",
+    "github",
+    "bitbucket",
 ];
 
 static LOGOS: OnceLock<HashMap<&'static str, OsLogo>> = OnceLock::new();
@@ -299,6 +307,9 @@ mod tests {
             ("ID=opensuse-leap\n", "opensuse"),
             ("ID=pop\n", "popos"),
             ("ID=almalinux\n", "almalinux"),
+            ("ID=openwrt\n", "openwrt"),
+            ("ID=ol\n", "oracle"),
+            ("ID=proxmox\n", "proxmox"),
             ("Darwin\n", "macos"),
             ("FreeBSD\n", "freebsd"),
             ("Linux\n", "linux"),

@@ -115,6 +115,14 @@ impl App {
 
     /// Handle a mouse event — clicks, scroll wheel, etc.
     pub fn handle_mouse(&mut self, mouse: MouseEvent) -> Result<()> {
+        // Right-click pastes the system clipboard (Termius-style). Handled
+        // before selection/remote-mouse routing so a right press never clears
+        // a drag or gets forwarded as a remote button.
+        if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Right)) {
+            self.paste_from_clipboard()?;
+            return Ok(());
+        }
+
         if matches!(self.mode, AppMode::Connecting | AppMode::Session) {
             // A drag begun over an overlay that closed mid-gesture must not
             // resurface as a highlight on the next one.
@@ -478,6 +486,31 @@ impl App {
                 ClickHit::SftpPane { pane, pos } => Some((pane, pos)),
                 _ => None,
             })
+    }
+
+    /// Paste the system clipboard through [`Self::handle_paste`]. Empty or
+    /// unreadable clipboards produce a short notice instead of a silent no-op.
+    fn paste_from_clipboard(&mut self) -> Result<()> {
+        match read_clipboard() {
+            Ok(text) if text.is_empty() => {
+                self.clipboard_notice("clipboard is empty");
+            }
+            Ok(text) => self.handle_paste(&text)?,
+            Err(e) => {
+                self.clipboard_notice(&format!("clipboard paste failed: {e}"));
+            }
+        }
+        Ok(())
+    }
+
+    fn clipboard_notice(&mut self, notice: &str) {
+        if self.session_is_rendered() {
+            if let Some(session) = self.active_session_mut() {
+                session.set_copy_notice(notice.to_string());
+                return;
+            }
+        }
+        self.host_notice = Some(notice.to_string());
     }
 
     /// Terminal-style drag selection over whatever is rendered (the zoomed

@@ -12,6 +12,8 @@ pub struct SshHost {
     /// `ssh -G` reported a `ProxyCommand`. Presence only: the command line is
     /// never stored or run (the network map shows it as an opaque hop).
     pub has_proxy_command: bool,
+    /// Per-host: append older OpenSSH algorithms so legacy peers can negotiate.
+    pub legacy_ssh: bool,
 }
 
 impl SshHost {
@@ -27,6 +29,7 @@ impl SshHost {
             remote_command: None,
             certificate_file: None,
             has_proxy_command: false,
+            legacy_ssh: false,
         }
     }
 }
@@ -63,6 +66,12 @@ pub fn build_ssh_argv(host: &SshHost) -> Vec<String> {
             "ForwardAgent={}",
             if forward { "yes" } else { "no" }
         ));
+    }
+
+    if host.legacy_ssh {
+        for opt in super::SSH_COMPAT_OPTS {
+            args.push((*opt).into());
+        }
     }
 
     let hostname = host.hostname.as_deref().unwrap_or(&host.name);
@@ -296,6 +305,27 @@ mod tests {
                 "deploy@10.0.0.50".to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn build_ssh_argv_appends_legacy_algorithms_only_when_enabled() {
+        let mut host = SshHost::new("router");
+        host.hostname = Some("192.0.2.1".into());
+        let plain = build_ssh_argv(&host);
+        assert!(!plain.iter().any(|a| a.contains("HostKeyAlgorithms=")));
+
+        host.legacy_ssh = true;
+        let argv = build_ssh_argv(&host);
+        assert!(argv
+            .windows(2)
+            .any(|w| w == ["-o", "HostKeyAlgorithms=+ssh-rsa"]));
+        assert!(argv
+            .windows(2)
+            .any(|w| w == ["-o", "PubkeyAcceptedAlgorithms=+ssh-rsa"]));
+        assert!(argv.windows(2).any(|w| {
+            w == ["-o", "KexAlgorithms=+diffie-hellman-group14-sha1"]
+        }));
+        assert_eq!(argv.last().map(String::as_str), Some("192.0.2.1"));
     }
 
     #[test]

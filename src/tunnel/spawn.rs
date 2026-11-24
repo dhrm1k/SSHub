@@ -85,6 +85,9 @@ pub fn build_tunnel_argv(
     if resolved.forward_agent {
         args.push("-A".into());
     }
+    if host.legacy_ssh {
+        crate::ssh::splice_ssh_compat_options(&mut args);
+    }
     if let Some(identity) = resolved.identity.as_ref() {
         if let Some(key) = identity.private_key.as_ref() {
             args.push("-i".into());

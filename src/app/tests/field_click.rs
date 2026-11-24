@@ -4,6 +4,9 @@
 use super::*;
 use crate::test_support::find_text;
 
+/// Host form labels are padded to this width inside the field panel.
+const HOST_LABEL_COLS: u16 = 24;
+
 fn draw(app: &mut App, w: u16, h: u16) -> ratatui::buffer::Buffer {
     app.terminal_area = ratatui::layout::Rect::new(0, 0, w, h);
     let mut term = ratatui::Terminal::new(ratatui::backend::TestBackend::new(w, h)).unwrap();
@@ -15,23 +18,27 @@ fn draw(app: &mut App, w: u16, h: u16) -> ratatui::buffer::Buffer {
 fn a_click_focuses_the_host_form_field_and_places_the_cursor() {
     let mut app = test_app(vec![]);
     app.enter_host_form(None, false).unwrap();
-    app.host_form.as_mut().unwrap().address = "10.0.0.1".into();
+    let form = app.host_form.as_mut().unwrap();
+    form.address = "10.0.0.1".into();
+    // Draw without the editing caret so the click map matches the bare value.
+    form.editing = false;
     let buf = draw(&mut app, 100, 30);
 
-    let (x, y) = find_text(&buf, "Port: ");
+    let (x, y) = find_text(&buf, "Port:");
     app.click_at(x + 2, y);
     assert_eq!(app.host_form.as_ref().unwrap().field, HostFormField::Port);
 
-    // Three cells into the value: the cursor lands before the fourth char.
-    let (x, y) = find_text(&buf, "Address: ");
-    let value_x = x + "Address: ".len() as u16;
+    let (x, y) = find_text(&buf, "Address:");
+    let value_x = x + HOST_LABEL_COLS;
     app.click_at(value_x + 3, y);
     let form = app.host_form.as_ref().unwrap();
     assert_eq!(form.field, HostFormField::Address);
     assert_eq!(form.cursor, 3);
 
-    // Past the end clamps to the end, and typing goes where the click put it.
-    app.click_at(value_x + 40, y);
+    // Past the last character clamps to the end; typing goes where the click
+    // put it. Use a cell just beyond the visible value (not deep into padding
+    // that wrap-trim drops from the click map).
+    app.click_at(value_x + 8, y);
     assert_eq!(app.host_form.as_ref().unwrap().cursor, 8);
     app.click_at(value_x, y);
     app.handle_key(key_char('x')).unwrap();
@@ -40,16 +47,13 @@ fn a_click_focuses_the_host_form_field_and_places_the_cursor() {
 
 #[test]
 fn a_click_on_an_unfocused_field_places_the_cursor_under_the_pointer() {
-    // An unfocused row starts with a blank marker that the form's trimming
-    // wrap drops on screen, so its value sits two cells left of where the
-    // line's spans would put it.
     let mut app = test_app(vec![]);
     app.enter_host_form(None, false).unwrap();
     app.host_form.as_mut().unwrap().username = "deploy".into();
     let buf = draw(&mut app, 100, 30);
 
-    let (x, y) = find_text(&buf, "Username: ");
-    app.click_at(x + "Username: ".len() as u16 + 3, y);
+    let (x, y) = find_text(&buf, "Username:");
+    app.click_at(x + HOST_LABEL_COLS + 3, y);
     let form = app.host_form.as_ref().unwrap();
     assert_eq!(form.field, HostFormField::Username);
     assert_eq!(form.cursor, 3);
@@ -80,8 +84,8 @@ fn a_click_on_a_wide_char_lands_on_that_char() {
     app.host_form.as_mut().unwrap().label = "日本サーバ".into();
     let buf = draw(&mut app, 100, 30);
 
-    let (x, y) = find_text(&buf, "Label: ");
-    let value_x = x + "Label: ".len() as u16;
+    let (x, y) = find_text(&buf, "Label:");
+    let value_x = x + HOST_LABEL_COLS;
     for cell in [4, 5] {
         app.click_at(value_x + cell, y);
         let form = app.host_form.as_ref().unwrap();
@@ -94,16 +98,15 @@ fn a_click_on_a_wide_char_lands_on_that_char() {
 }
 
 #[test]
-fn a_wrapped_host_form_value_does_not_shift_the_rows_below_it() {
-    // The host form wraps long values, pushing every later field down a row
-    // or more. The click map follows the wrap rather than assuming one row
-    // per field.
+fn a_long_host_form_value_stays_on_one_row_and_does_not_shift_rows_below() {
+    // Field values are ellipsized to one row so the panel stays non-scrollable;
+    // later fields keep their row even when Address is very long.
     let mut app = test_app(vec![]);
     app.enter_host_form(None, false).unwrap();
     app.host_form.as_mut().unwrap().address = "a".repeat(150);
     let buf = draw(&mut app, 100, 30);
 
-    let (x, y) = find_text(&buf, "Username: ");
+    let (x, y) = find_text(&buf, "Username:");
     app.click_at(x + 3, y);
     assert_eq!(
         app.host_form.as_ref().unwrap().field,
@@ -236,10 +239,9 @@ fn a_click_on_a_word_wrapped_prompt_row_lands_on_the_char_drawn_there() {
 }
 
 #[test]
-fn a_click_on_a_host_form_value_wrapped_below_its_label_lands_on_the_char_drawn_there() {
-    // The host form's trimming word wrap moves a value that does not fit
-    // after its label to the next row whole, and drops the blank it breaks
-    // the value at again further on.
+fn a_click_on_an_ellipsized_host_form_value_lands_on_the_visible_char() {
+    // Long values stay on the label row (ellipsized); a click on the visible
+    // prefix still places the cursor on that char.
     let mut app = test_app(vec![]);
     app.enter_host_form(None, false).unwrap();
     app.host_form.as_mut().unwrap().remote_command = format!("QQQ{} ZZZ", "x".repeat(62));
@@ -247,18 +249,10 @@ fn a_click_on_a_host_form_value_wrapped_below_its_label_lands_on_the_char_drawn_
 
     let (_, label_row) = find_text(&buf, "Startup command:");
     let (x, y) = find_text(&buf, "QQQ");
-    assert_eq!(y, label_row + 1, "the value starts on the next row");
+    assert_eq!(y, label_row, "the value stays on the label row");
     app.click_at(x + 1, y);
     let form = app.host_form.as_ref().unwrap();
     assert_eq!((form.field, form.cursor), (HostFormField::RemoteCommand, 1));
-
-    // `ZZZ` wrapped to a row of its own, its blank dropped. The field now has
-    // focus and draws `_` after the first `Q`, so draw again first.
-    let buf = draw(&mut app, 100, 30);
-    let (x, z_row) = find_text(&buf, "ZZZ");
-    assert_eq!(z_row, y + 1, "the last word wrapped");
-    app.click_at(x + 1, z_row);
-    assert_eq!(app.host_form.as_ref().unwrap().cursor, 67);
 }
 
 #[test]

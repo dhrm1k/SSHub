@@ -98,6 +98,9 @@ pub struct ManagedHost {
     pub ping: SessionLoggingOverride,
     /// Explicit transport. `None` = inherit from the group chain, else ssh.
     pub transport: Option<SessionTransport>,
+    /// Append older OpenSSH algorithms (`+ssh-rsa`, …) on connect so appliances
+    /// that only offer them can negotiate. Off by default.
+    pub legacy_ssh: bool,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -124,6 +127,7 @@ pub struct NewHost {
     pub session_logging: SessionLoggingOverride,
     pub ping: SessionLoggingOverride,
     pub transport: Option<SessionTransport>,
+    pub legacy_ssh: bool,
 }
 
 impl Default for NewHost {
@@ -154,6 +158,7 @@ impl NewHost {
             session_logging: SessionLoggingOverride::Inherit,
             ping: SessionLoggingOverride::Inherit,
             transport: Some(SessionTransport::Ssh),
+            legacy_ssh: false,
         }
     }
 }
@@ -185,6 +190,7 @@ pub struct HostUpdate {
     pub ping: Option<SessionLoggingOverride>,
     /// Outer `Some` = change the transport; inner `None` = restore inheritance.
     pub transport: Option<Option<SessionTransport>>,
+    pub legacy_ssh: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

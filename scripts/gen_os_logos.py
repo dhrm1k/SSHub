@@ -47,6 +47,12 @@ IDS = {
     "freebsd": "freebsd",
     "macos": "macos",
     "linux": "linux",
+    "openwrt": "openwrt",
+    "oracle": "oracle",
+    "proxmox": "Proxmox",
+    # WSL reuses the Tux (linux) mark; docker/github/bitbucket are not in
+    # fastfetch — their large art is maintained by hand in the JSON.
+    "wsl": "linux",
 }
 
 # Colours are stored as either an ANSI 16-colour INDEX (0-15, an int) so the
@@ -158,12 +164,25 @@ def dump_logo(name):
     return lines
 
 
+# Large art with no fastfetch source — keep these when regenerating.
+HAND_MAINTAINED = ("docker", "github", "bitbucket")
+
+
 def main():
     if subprocess.run(["which", "fastfetch"], capture_output=True).returncode != 0:
         raise SystemExit("fastfetch not found on PATH")
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    out = {cid: dump_logo(name) for cid, name in IDS.items()}
     dest = os.path.join(root, "assets", "os_logos_large.json")
+    existing = {}
+    if os.path.exists(dest):
+        with open(dest, encoding="utf-8") as f:
+            existing = json.load(f)
+    out = {cid: dump_logo(name) for cid, name in IDS.items()}
+    for cid in HAND_MAINTAINED:
+        if cid in existing:
+            out[cid] = existing[cid]
+        else:
+            print(f"warning: missing hand-maintained large logo for {cid}", file=sys.stderr)
     with open(dest, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
         f.write("\n")

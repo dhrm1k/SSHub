@@ -87,7 +87,7 @@ pub const NAME_WIDTH_STEP: usize = 8;
 /// Maximum UI zoom level.
 pub const UI_ZOOM_MAX: usize = 3;
 
-pub const OS_ICON_OPTIONS: [&str; 22] = [
+pub const OS_ICON_OPTIONS: [&str; 30] = [
     "(none)",
     "arch",
     "ubuntu",
@@ -97,6 +97,7 @@ pub const OS_ICON_OPTIONS: [&str; 22] = [
     "rocky",
     "rhel",
     "centos",
+    "almalinux",
     "opensuse",
     "linuxmint",
     "manjaro",
@@ -110,6 +111,13 @@ pub const OS_ICON_OPTIONS: [&str; 22] = [
     "macos",
     "windows",
     "linux",
+    "openwrt",
+    "oracle",
+    "proxmox",
+    "docker",
+    "wsl",
+    "github",
+    "bitbucket",
 ];
 
 /// A one-line, non-fatal summary of the theme start-up diagnostics, or `None`

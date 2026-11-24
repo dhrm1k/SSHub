@@ -76,8 +76,8 @@ pub(crate) fn host_form_up_down_navigate_fields_in_both_directions() {
         HostFormField::Address
     );
 
-    // Navigate to the end (16 downs from Address)
-    for _ in 0..16 {
+    // Navigate to the end (17 downs from Address across 18 fields).
+    for _ in 0..17 {
         app.handle_key(key(KeyCode::Down)).unwrap();
     }
     assert_eq!(app.host_form.as_ref().unwrap().field, HostFormField::OsIcon);

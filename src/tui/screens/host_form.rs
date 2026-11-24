@@ -1,6 +1,7 @@
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Wrap};
+use unicode_width::UnicodeWidthStr;
 
 use crate::app::hop_editor::HopSection;
 use crate::app::{HostFormEdit, HostFormField, OS_ICON_OPTIONS};
@@ -8,6 +9,10 @@ use crate::store::{HostGroup, Identity};
 use crate::text_input;
 use crate::theme::catalog::StyleRole;
 use crate::theme::model::ResolvedTheme;
+
+/// Fixed label column inside the field panel so values line up.
+/// Fits `Tags (comma-separated):` without ellipsizing the colon away.
+const LABEL_COLS: usize = 24;
 
 /// Eight args: form state plus every list it names (groups, identities) plus
 /// the resolved inheritance shown as placeholders, plus chrome. Bundling
@@ -42,8 +47,13 @@ pub fn render_host_form(
     // — pickers, group form, keybind editor, tunnel reconnect — keep their own
     // family's marker role instead.
     let focus = theme.style(StyleRole::FocusIndicator);
+    let box_style = theme.style(StyleRole::FormHelp);
 
-    let mut lines = Vec::with_capacity(HostFormField::ALL.len() + 2);
+    // One shared panel around every field row (top + N rows + bottom). Values
+    // are ellipsized to a single cell row so the form stays non-scrollable on
+    // a 24-row terminal; the hop editor still injects its own nested boxes.
+    let box_w = (width as usize).max(20);
+    let mut lines = Vec::with_capacity(HostFormField::ALL.len() + 6);
     let mut keep = None;
     if form.metadata_only {
         lines.push((
@@ -53,8 +63,11 @@ pub fn render_host_form(
             )),
             None,
         ));
-        lines.push((Line::from(""), None));
     }
+    lines.push((
+        Line::from(Span::styled(panel_top(box_w, "fields"), box_style)),
+        None,
+    ));
     for (index, field) in HostFormField::ALL.into_iter().enumerate() {
         let active = form.field == field;
         let editing = active && form.editing;
@@ -159,6 +172,14 @@ pub fn render_host_form(
                     ),
                 },
             ),
+            HostFormField::LegacySsh => (
+                "Legacy SSH algs",
+                if form.legacy_ssh {
+                    "on (+ssh-rsa, Space to toggle)".to_string()
+                } else {
+                    "off (Space to enable for old servers)".to_string()
+                },
+            ),
             HostFormField::RemoteCommand => (
                 "Startup command",
                 if editing {
@@ -194,24 +215,28 @@ pub fn render_host_form(
                 "Password",
                 // Masked while typing too, now that the field arrives prefilled
                 // with the stored secret: walking onto it must not expose one.
-                // The reveal bind is the way to see it — and it says so on the
-                // row itself, because the footer that used to be its only
-                // mention is the first thing a short terminal clips, which left
-                // a wall of dots and no way to know a reveal exists at all.
-                if editing && form.password_revealed {
-                    text_input::with_cursor(&form.password, form.cursor)
-                } else if editing {
-                    let masked = text_input::with_cursor(
-                        &"\u{25CF}".repeat(form.password.chars().count()),
-                        form.cursor,
-                    );
-                    if secret_hints.is_empty() {
-                        masked
+                // Show/copy binds live on the row itself (not a second hint
+                // line) so a 24-row terminal never has to scroll to find them.
+                {
+                    let body = if editing && form.password_revealed {
+                        text_input::with_cursor(&form.password, form.cursor)
+                    } else if editing {
+                        text_input::with_cursor(
+                            &"\u{25CF}".repeat(form.password.chars().count()),
+                            form.cursor,
+                        )
                     } else {
-                        format!("{masked}    {}", reveal_hint(secret_hints))
+                        password_display(
+                            &form.password,
+                            form.has_password,
+                            form.password_revealed,
+                        )
+                    };
+                    if active && !secret_hints.is_empty() {
+                        format!("{body}    {secret_hints}")
+                    } else {
+                        body
                     }
-                } else {
-                    password_display(&form.password, form.has_password, form.password_revealed)
                 },
             ),
             HostFormField::SecretLookup => (
@@ -272,11 +297,19 @@ pub fn render_host_form(
             theme.style(StyleRole::FormValue)
         };
         let prefix_style = if active { focus } else { label_style };
+        // Left rail + prefix + label column + value. No per-row right `│` so
+        // the value stays the last span (click-to-cursor) and editing underline
+        // does not paint the border; top/bottom caps still close the panel.
+        let value_cols = box_w.saturating_sub(2 + 2 + LABEL_COLS).max(4);
+        let label_text =
+            crate::tui::text::pad_ellipsize(&format!("{label}{suffix}:"), LABEL_COLS);
+        let value_text = crate::tui::text::pad_ellipsize(&display, value_cols);
         lines.push((
             Line::from(vec![
+                Span::styled("\u{2502} ", box_style),
                 Span::styled(prefix, prefix_style),
-                Span::styled(format!("{label}{suffix}: "), label_style),
-                Span::styled(display, value_style),
+                Span::styled(label_text, label_style),
+                Span::styled(value_text, value_style),
             ]),
             Some(index),
         ));
@@ -286,28 +319,28 @@ pub fn render_host_form(
             }
         }
     }
-
-    lines.push((Line::from(""), None));
-    if form.field == HostFormField::Password && !secret_hints.is_empty() {
-        // See the identity form: a masked value needs its binds said out loud.
-        lines.push((
-            Line::from(Span::styled(secret_hints.to_string(), help)),
-            None,
-        ));
-    }
     lines.push((
-        Line::from(Span::styled(
-            "Tab/↓: next field    Enter: open picker (Group/Identity)    Ctrl+U/W: kill line/word",
-            help,
-        )),
+        Line::from(Span::styled(panel_bottom(box_w), box_style)),
         None,
     ));
+
+    // Single hint row under the panel (no blank spacer) so the +2 panel caps
+    // stay within the non-scrollable 24-row budget.
     let save = format!("{save_hint}: save");
-    let legend: Vec<&str> = [save.as_str(), copy_hint, "Esc: cancel"]
-        .into_iter()
-        .filter(|s| !s.is_empty())
-        .collect();
-    lines.push((Line::from(Span::styled(legend.join("    "), help)), None));
+    let mut hint_parts: Vec<&str> = vec![
+        "Tab/↓ next",
+        "Enter picker",
+        "Ctrl+U/W kill",
+        save.as_str(),
+    ];
+    if !copy_hint.is_empty() {
+        hint_parts.push(copy_hint);
+    }
+    hint_parts.push("Esc: cancel");
+    lines.push((
+        Line::from(Span::styled(hint_parts.join("  \u{2502}  "), help)),
+        None,
+    ));
 
     super::FormBody::new(
         lines,
@@ -315,9 +348,21 @@ pub fn render_host_form(
             .borders(Borders::ALL)
             .border_style(border)
             .title(Span::styled(title, theme.style(StyleRole::PopupTitle))),
+        // Field rows are sized to one line; wrap only helps the metadata banner.
         Some(Wrap { trim: true }),
     )
     .keep_visible(keep)
+}
+
+fn panel_top(width: usize, title: &str) -> String {
+    let head = format!("\u{250c}\u{2500} {title} ");
+    let fill = width.saturating_sub(head.width() + 1);
+    format!("{head}{}\u{2510}", "\u{2500}".repeat(fill))
+}
+
+fn panel_bottom(width: usize) -> String {
+    let fill = width.saturating_sub(2);
+    format!("\u{2514}{}\u{2518}", "\u{2500}".repeat(fill))
 }
 
 fn display_text(value: &str) -> String {
@@ -373,16 +418,6 @@ fn identity_label(index: usize, identities: &[Identity]) -> String {
         .unwrap_or_else(|| "(none)".to_string())
 }
 
-/// The reveal half of the secret hints — the part that fits on the row next to a
-/// masked value. The full pair (show + copy) stays in the footer.
-fn reveal_hint(secret_hints: &str) -> &str {
-    secret_hints
-        .split('\u{2502}')
-        .next()
-        .unwrap_or_default()
-        .trim()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -428,6 +463,7 @@ mod tests {
             tags: String::new(),
             proxy_jump: String::new(),
             forward_agent: None,
+            legacy_ssh: false,
             remote_command: String::new(),
             transport: None,
             session_logging: crate::session_log::SessionLoggingOverride::Inherit,
@@ -500,6 +536,23 @@ mod tests {
                 "rendered form should contain {expected:?}"
             );
         }
+    }
+
+    #[test]
+    fn field_panel_draws_a_shared_box() {
+        let text = rendered_text(&empty_form(), &inherited_all_set());
+        assert!(
+            text.contains("fields"),
+            "panel title missing:\n{text}"
+        );
+        assert!(
+            text.contains('\u{250c}') && text.contains('\u{2514}'),
+            "panel corners missing:\n{text}"
+        );
+        assert!(
+            text.contains('\u{2502}'),
+            "panel side rail missing:\n{text}"
+        );
     }
 
     #[test]

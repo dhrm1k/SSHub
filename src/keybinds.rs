@@ -554,8 +554,18 @@ impl Default for KeybindsConfig {
             audit_range: vec!["r".into()],
             session_new_tab: vec!["Ctrl+T".into()],
             session_close_tab: vec!["Ctrl+W".into()],
-            session_tab_prev: vec!["Ctrl+[".into(), "Ctrl+PageUp".into()],
-            session_tab_next: vec!["Ctrl+]".into(), "Ctrl+PageDown".into()],
+            // Alt+Left/Right match Termius-style session-tab cycling; panel
+            // focus uses Alt+Shift+arrows so the chords do not collide.
+            session_tab_prev: vec![
+                "Ctrl+[".into(),
+                "Ctrl+PageUp".into(),
+                "Alt+Left".into(),
+            ],
+            session_tab_next: vec![
+                "Ctrl+]".into(),
+                "Ctrl+PageDown".into(),
+                "Alt+Right".into(),
+            ],
             session_detach: vec!["Ctrl+D".into()],
             // Alt+Shift+letter: every Alt+letter that no shell binds is taken by
             // the split view, and remote apps (readline, tmux, vim) leave the
@@ -574,10 +584,11 @@ impl Default for KeybindsConfig {
             confirm_no: vec!["n".into(), "N".into()],
             cancel: vec!["Esc".into()],
             toggle_panel_zoom: vec!["z".into(), "Alt+Enter".into()],
-            focus_panel_left: vec!["Alt+Left".into()],
-            focus_panel_right: vec!["Alt+Right".into()],
-            focus_panel_up: vec!["Alt+Up".into()],
-            focus_panel_down: vec!["Alt+Down".into()],
+            // Alt+arrows are reserved for session-tab cycling (Termius-style).
+            focus_panel_left: vec!["Alt+Shift+Left".into()],
+            focus_panel_right: vec!["Alt+Shift+Right".into()],
+            focus_panel_up: vec!["Alt+Shift+Up".into()],
+            focus_panel_down: vec!["Alt+Shift+Down".into()],
             broadcast: vec!["b".into()],
             broadcast_cancel: vec!["x".into()],
             known_hosts: vec!["H".into()],

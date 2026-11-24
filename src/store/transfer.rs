@@ -1004,6 +1004,7 @@ pub fn apply_transfer_plan_with_secrets(
                                     session_logging: src_host.session_logging,
                                     ping: src_host.ping,
                                     transport: src_host.transport,
+                                    legacy_ssh: src_host.legacy_ssh,
                                 },
                             );
                             let created_host = match created {

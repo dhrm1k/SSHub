@@ -463,6 +463,7 @@ pub fn resolved_to_ssh_host(
     host.proxy_jump = resolved.jump_argv.clone();
     host.forward_agent = Some(resolved.forward_agent);
     host.remote_command = m.remote_command.clone();
+    host.legacy_ssh = m.legacy_ssh;
     host
 }
 
@@ -533,6 +534,14 @@ pub(crate) fn copy_secret_notice(secret: &str, what: &str) -> String {
 /// session's PTY clipboard relay.
 pub(crate) fn write_osc52(text: &str) -> std::io::Result<()> {
     crate::osc52::write_text(text)
+}
+
+/// Read plain text from the system clipboard (right-click paste). OSC 52 only
+/// covers writes; reads go through the host clipboard API.
+pub(crate) fn read_clipboard() -> Result<String, String> {
+    arboard::Clipboard::new()
+        .and_then(|mut clip| clip.get_text())
+        .map_err(|e| e.to_string())
 }
 
 /// Expand a leading `~` (or `~/`) in a path to the user's home directory.

@@ -324,6 +324,7 @@ impl LauncherStore {
                 Some(v) => v,
                 None => current.transport,
             };
+            let legacy_ssh = update.legacy_ssh.unwrap_or(current.legacy_ssh);
             let tags_json = tags_to_json(&tags)?;
             let now = now_ts();
 
@@ -333,7 +334,7 @@ impl LauncherStore {
                      os_icon = ?7, tags = ?8, notes = ?9, proxy_jump = ?10, forward_agent = ?11,
                      remote_command = ?12, favorite = ?13, sort_order = ?14, has_password = ?15, username = ?16, updated_at = ?17,
                      environment = ?19, session_logging = ?20, transport = ?21, ping = ?22,
-                     secret_lookup = ?23
+                     secret_lookup = ?23, legacy_ssh = ?24
                  WHERE id = ?18",
                 params![
                     name,
@@ -359,6 +360,7 @@ impl LauncherStore {
                     transport.map(|t| t.to_db()),
                     ping.to_db(),
                     secret_lookup,
+                    i64::from(legacy_ssh),
                 ],
             )?;
 
@@ -592,6 +594,7 @@ impl LauncherStore {
             session_logging: current.session_logging,
             ping: current.ping,
             transport: current.transport,
+            legacy_ssh: current.legacy_ssh,
         })
         .map(Some)
     }
@@ -958,9 +961,10 @@ pub(super) fn create_host_on(conn: &rusqlite::Connection, host: &NewHost) -> Res
         "INSERT INTO hosts
             (name, label, address, port, group_id, identity_id, os_icon, tags, notes,
              proxy_jump, forward_agent, remote_command, source, has_password, username,
-             session_logging, transport, ping, secret_lookup, sort_order, created_at, updated_at)
+             session_logging, transport, ping, secret_lookup, legacy_ssh, sort_order,
+             created_at, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
-             ?16, ?17, ?19, ?20,
+             ?16, ?17, ?19, ?20, ?21,
              (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM hosts), ?18, ?18)",
         params![
             host.name,
@@ -983,6 +987,7 @@ pub(super) fn create_host_on(conn: &rusqlite::Connection, host: &NewHost) -> Res
             now,
             host.ping.to_db(),
             host.secret_lookup,
+            i64::from(host.legacy_ssh),
         ],
     )?;
     let id = conn.last_insert_rowid();
@@ -1138,7 +1143,8 @@ fn load_host_by_id(conn: &rusqlite::Connection, id: i64) -> Result<Option<Manage
                 g.default_port, g.default_proxy_jump, g.default_transport,
                 g.default_forward_agent, g.parent_id, g.reserved,
                 i.id, i.name, i.username, i.private_key, i.certificate, i.has_password,
-                h.environment, h.session_logging, h.transport, h.ping, h.secret_lookup
+                h.environment, h.session_logging, h.transport, h.ping, h.secret_lookup,
+                h.legacy_ssh
          FROM hosts h
          LEFT JOIN host_groups g ON g.id = h.group_id
          LEFT JOIN identities i ON i.id = h.identity_id
@@ -1517,6 +1523,7 @@ fn row_to_managed_host(row: &rusqlite::Row<'_>) -> rusqlite::Result<ManagedHost>
             .get::<_, Option<String>>(41)?
             .map(|s| SessionTransport::from_db(Some(s.as_str()))),
         ping: SessionLoggingOverride::from_db(row.get(42).ok()),
+        legacy_ssh: row.get::<_, i64>(44).unwrap_or(0) != 0,
         created_at: row.get(19)?,
         updated_at: row.get(20)?,
     })
@@ -1545,6 +1552,7 @@ fn update_changes_connection_fields(update: &HostUpdate) -> bool {
         || update.proxy_jump.is_some()
         || update.forward_agent.is_some()
         || update.remote_command.is_some()
+        || update.legacy_ssh.is_some()
 }
 
 #[cfg(test)]

@@ -3,7 +3,7 @@ use rusqlite::{params, Connection};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const SCHEMA_VERSION: i64 = 21;
+const SCHEMA_VERSION: i64 = 22;
 
 /// Name of the reserved, auto-created "Favorites" group. Membership in it is the
 /// source of truth for a host's favourite status.
@@ -245,6 +245,10 @@ pub(crate) fn run_migrations(conn: &Connection, launcher_path: &Path) -> Result<
 
     if current < 21 {
         migrate_v20_to_v21(conn)?;
+    }
+
+    if current < 22 {
+        migrate_v21_to_v22(conn)?;
     }
 
     // Runs last so all columns it writes to (e.g. environment) already exist.
@@ -843,6 +847,21 @@ fn migrate_v19_to_v20(conn: &Connection) -> Result<()> {
 /// `ON DELETE CASCADE` / `SET NULL`, so child rows are copied out and put back
 /// (ids are preserved, so they still match). The copy inserts explicit ids,
 /// which seeds `sqlite_sequence` with each table's current maximum.
+/// Per-host OpenSSH algorithm compatibility (#legacy_ssh): when set, connect
+/// appends `HostKeyAlgorithms=+ssh-rsa` and related options so older peers
+/// (Dropbear / OpenWrt / appliances) can negotiate without a global default.
+fn migrate_v21_to_v22(conn: &Connection) -> Result<()> {
+    let has: i64 = conn
+        .prepare("SELECT COUNT(*) FROM pragma_table_info('hosts') WHERE name = 'legacy_ssh'")?
+        .query_row([], |row| row.get(0))?;
+    if has == 0 {
+        conn.execute_batch(
+            "ALTER TABLE hosts ADD COLUMN legacy_ssh INTEGER NOT NULL DEFAULT 0;",
+        )?;
+    }
+    Ok(())
+}
+
 fn migrate_v20_to_v21(conn: &Connection) -> Result<()> {
     if !has_autoincrement(conn, "identities")? {
         conn.execute_batch(
@@ -1366,7 +1385,7 @@ INSERT INTO host_groups (name, sort_order, reserved, created_at)
                 |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
             )
             .unwrap();
-        assert_eq!((version, workspaces, hosts), (21, 0, 1));
+        assert_eq!((version, workspaces, hosts), (22, 0, 1));
         let snapshots: Vec<String> = std::fs::read_dir(dir.path())
             .unwrap()
             .flatten()
@@ -1374,6 +1393,14 @@ INSERT INTO host_groups (name, sort_order, reserved, created_at)
             .filter(|n| n.starts_with("launcher.db.bak-v19-"))
             .collect();
         assert_eq!(snapshots.len(), 1, "{snapshots:?}");
+        let legacy: i64 = migrated
+            .query_row(
+                "SELECT legacy_ssh FROM hosts WHERE name = 'a'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(legacy, 0);
     }
 
     /// An existing host comes through v19 with no lookup (NULL), and a

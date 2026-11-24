@@ -555,6 +555,59 @@ pub fn maybe_run_askpass() -> bool {
 mod tests {
     use super::*;
 
+    /// Copy `/bin/bash` to `dir/ssh`, sync, and chmod +x.
+    ///
+    /// A plain `fs::copy` then immediate `exec` races with writers/scanners on
+    /// some kernels (`ETXTBSY` / "Text file busy"). Write to a temp name, sync,
+    /// rename, then callers retry spawn if the kernel still says busy.
+    #[cfg(unix)]
+    fn install_bash_as_ssh(dir: &Path) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        let ssh = dir.join("ssh");
+        let part = dir.join("ssh.part");
+        std::fs::copy("/bin/bash", &part).expect("copy bash");
+        let mut perms = std::fs::metadata(&part).expect("stat").permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&part, perms).expect("chmod");
+        if let Ok(f) = std::fs::File::open(&part) {
+            let _ = f.sync_all();
+        }
+        std::fs::rename(&part, &ssh).expect("rename ssh stand-in");
+        ssh
+    }
+
+    /// Run `ssh -c script` with retries on `ETXTBSY` (ExecutableFileBusy).
+    fn output_ssh(
+        ssh: &Path,
+        script: &str,
+        envs: impl IntoIterator<Item = (impl AsRef<std::ffi::OsStr>, impl AsRef<std::ffi::OsStr>)>
+            + Clone,
+    ) -> std::process::Output {
+        let mut last = None;
+        for _ in 0..20 {
+            match std::process::Command::new(ssh)
+                .args(["-c", script])
+                .envs(envs.clone())
+                .output()
+            {
+                Ok(out) => return out,
+                Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy => {
+                    last = Some(e);
+                    std::thread::sleep(std::time::Duration::from_millis(25));
+                }
+                Err(e) => panic!("spawn ssh stand-in: {e}"),
+            }
+        }
+        panic!("ssh stand-in still busy after retries: {last:?}");
+    }
+
+    fn helper_cmd() -> String {
+        format!(
+            "'{}' --exact session::askpass::tests::file_helper_entry --nocapture; echo helper-exit=$?",
+            helper_exe().expect("helper exe").display()
+        )
+    }
+
     #[test]
     fn file_helper_entry() {
         if std::env::var_os("SSHUB_TEST_FILE_HELPER").is_some() {
@@ -573,7 +626,7 @@ mod tests {
         };
         std::fs::write(&guard.path, "s3cr3t\n").unwrap();
         let path = guard.outlive();
-        let out = std::process::Command::new(std::env::current_exe().unwrap())
+        let out = std::process::Command::new(helper_exe().unwrap())
             .args([
                 "--exact",
                 "session::askpass::tests::file_helper_entry",
@@ -597,25 +650,21 @@ mod tests {
         // inherits its askpass environment. Stand-ins named `ssh` (a copy of
         // bash) rebuild both process trees around a real helper process.
         let dir = tempfile::tempdir().unwrap();
-        let ssh = dir.path().join("ssh");
-        std::fs::copy("/bin/bash", &ssh).unwrap();
+        let ssh = install_bash_as_ssh(dir.path());
         // Staged in this test's own dir: another test repoints XDG_RUNTIME_DIR.
         let guard = AskpassSecret {
             path: dir.path().join("secret"),
         };
         std::fs::write(&guard.path, "s3cr3t\n").unwrap();
-        let helper = format!(
-            "'{}' --exact session::askpass::tests::file_helper_entry --nocapture; echo helper-exit=$?",
-            std::env::current_exe().unwrap().display()
-        );
+        let helper = helper_cmd();
         let run = |script: &str| {
-            let out = std::process::Command::new(&ssh)
-                .args(["-c", script])
-                .env("SSHUB_TEST_FILE_HELPER", "1")
-                .env("SSHUB_TEST_PROMPT", "ops@192.0.2.91's password: ")
-                .envs(guard.env(Path::new("unused")))
-                .output()
-                .unwrap();
+            let mut envs = guard.env(Path::new("unused"));
+            envs.push(("SSHUB_TEST_FILE_HELPER".into(), "1".into()));
+            envs.push((
+                "SSHUB_TEST_PROMPT".into(),
+                "ops@192.0.2.91's password: ".into(),
+            ));
+            let out = output_ssh(&ssh, script, envs);
             String::from_utf8_lossy(&out.stdout).into_owned()
         };
 
@@ -640,8 +689,7 @@ mod tests {
         use super::super::hop_auth::HopSecret;
         // Same process-tree stand-ins as above: `ssh` is a copy of bash.
         let dir = tempfile::tempdir().unwrap();
-        let ssh = dir.path().join("ssh");
-        std::fs::copy("/bin/bash", &ssh).unwrap();
+        let ssh = install_bash_as_ssh(dir.path());
         // The hops' secrets sit in a file credential store (as the helper will
         // reopen it); only references are staged.
         let creds = dir.path().join("credentials.json");
@@ -679,18 +727,12 @@ mod tests {
         );
         std::fs::copy(guard.path.clone(), &path).unwrap();
         let guard = AskpassSecret { path };
-        let helper = format!(
-            "'{}' --exact session::askpass::tests::file_helper_entry --nocapture; echo helper-exit=$?",
-            std::env::current_exe().unwrap().display()
-        );
+        let helper = helper_cmd();
         let run = |script: &str, prompt: &str| {
-            let out = std::process::Command::new(&ssh)
-                .args(["-c", script])
-                .env("SSHUB_TEST_FILE_HELPER", "1")
-                .env("SSHUB_TEST_PROMPT", prompt)
-                .envs(guard.env(Path::new("unused")))
-                .output()
-                .unwrap();
+            let mut envs = guard.env(Path::new("unused"));
+            envs.push(("SSHUB_TEST_FILE_HELPER".into(), "1".into()));
+            envs.push(("SSHUB_TEST_PROMPT".into(), prompt.into()));
+            let out = output_ssh(&ssh, script, envs);
             String::from_utf8_lossy(&out.stdout).into_owned()
         };
         // The hop's own ssh, whose last argument is the host it connects to.
@@ -821,23 +863,16 @@ mod tests {
         // account password on the password fallback, and a 2FA code or a
         // host-key question gets nothing. `ssh` here is a copy of bash.
         let dir = tempfile::tempdir().unwrap();
-        let ssh = dir.path().join("ssh");
-        std::fs::copy("/bin/bash", &ssh).unwrap();
+        let ssh = install_bash_as_ssh(dir.path());
         let guard =
             AskpassSecret::staged(Some(&PendingSecret::Passphrase("key-phrase".into())), &[])
                 .unwrap();
-        let helper = format!(
-            "'{}' --exact session::askpass::tests::file_helper_entry --nocapture; echo helper-exit=$?",
-            std::env::current_exe().unwrap().display()
-        );
+        let helper = helper_cmd();
         let run = |prompt: &str| {
-            let out = std::process::Command::new(&ssh)
-                .args(["-c", &helper])
-                .env("SSHUB_TEST_FILE_HELPER", "1")
-                .env("SSHUB_TEST_PROMPT", prompt)
-                .envs(guard.env(Path::new("unused")))
-                .output()
-                .unwrap();
+            let mut envs = guard.env(Path::new("unused"));
+            envs.push(("SSHUB_TEST_FILE_HELPER".into(), "1".into()));
+            envs.push(("SSHUB_TEST_PROMPT".into(), prompt.into()));
+            let out = output_ssh(&ssh, &helper, envs);
             String::from_utf8_lossy(&out.stdout).into_owned()
         };
         let ok = run("Enter passphrase for key '/home/u/.ssh/id': ");

@@ -75,6 +75,7 @@ impl App {
                 tags: managed.tags.join(", "),
                 proxy_jump: managed.proxy_jump.clone().unwrap_or_default(),
                 forward_agent: managed.forward_agent,
+                legacy_ssh: managed.legacy_ssh,
                 remote_command: managed.remote_command.clone().unwrap_or_default(),
                 transport: managed.transport,
                 session_logging: managed.session_logging,
@@ -120,6 +121,7 @@ impl App {
                 tags: String::new(),
                 proxy_jump: String::new(),
                 forward_agent: None,
+                legacy_ssh: false,
                 remote_command: String::new(),
                 transport: None,
                 session_logging: crate::session_log::SessionLoggingOverride::Inherit,
@@ -348,6 +350,7 @@ impl App {
                     session_logging: Some(form.session_logging),
                     ping: Some(form.ping),
                     transport: Some(form.transport),
+                    legacy_ssh: Some(form.legacy_ssh),
                     ..Default::default()
                 },
             )?;
@@ -373,6 +376,7 @@ impl App {
                 session_logging: form.session_logging,
                 ping: form.ping,
                 transport: form.transport,
+                legacy_ssh: form.legacy_ssh,
             })?;
             self.store.set_host_groups(created.id, &group_ids)?;
             if host_pw_changed {
@@ -447,6 +451,7 @@ impl App {
             KeyCode::Char(' ')
                 if key.modifiers.is_empty()
                     && (field == HostFormField::ForwardAgent
+                        || field == HostFormField::LegacySsh
                         || field == HostFormField::Transport
                         || field.is_tri_state()) =>
             {
@@ -514,6 +519,9 @@ impl App {
                 Some(true) => Some(false),
                 Some(false) => None,
             };
+            form.dirty = true;
+        } else if form.field == HostFormField::LegacySsh {
+            form.legacy_ssh = !form.legacy_ssh;
             form.dirty = true;
         } else if form.field == HostFormField::Transport {
             // inherit → ssh → mosh → inherit.

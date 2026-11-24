@@ -1,5 +1,6 @@
 pub mod agent;
 pub mod cert;
+mod compat;
 mod export;
 mod host;
 mod import;
@@ -8,6 +9,10 @@ pub mod probe;
 mod resolver;
 pub mod test_connect;
 
+pub use compat::{
+    inject_mosh_ssh_compat, mosh_ssh_command_with_compat, splice_ssh_compat_options,
+    SSH_COMPAT_OPTS,
+};
 pub use export::{
     atomic_write_with_backup, export_launcher_hosts, export_launcher_hosts_to, exported_conf_path,
     exported_conf_path_in, render_launcher_hosts,

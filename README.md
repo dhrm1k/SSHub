@@ -409,7 +409,7 @@ Defaults below. Rebind any action with **Ctrl+K** (saved to `config.toml`). Pres
 | `Alt+Shift+T`          | Local shell tab                     |
 | `Ctrl+W`               | Close session tab                   |
 | `Ctrl+D`               | Detach to dashboard (SSH keeps running) |
-| `Ctrl+[` / `Ctrl+]`, `Ctrl+PgUp` / `Ctrl+PgDn` | Previous / next session tab |
+| `Ctrl+[` / `Ctrl+]`, `Ctrl+PgUp` / `Ctrl+PgDn`, `Alt+←` / `Alt+→` | Previous / next session tab |
 | `Alt+Shift+F`          | Open SFTP for this host (the session keeps running) |
 | `Alt+Shift+N`          | Share this machine's network with the host, or stop sharing (ssh sessions only) |
 | `Ctrl+N`               | Run a command snippet (`Enter` runs, `Tab` inserts without a newline) |
@@ -462,7 +462,7 @@ arrives as arrow keys, exactly as in a real terminal.
 | `Shift+↑` / `Shift+↓` | Jump to the previous / next group header |
 | `Shift+Z`          | Collapse / expand all groups |
 | `+` / `-`          | Widen / narrow the hosts column |
-| `Alt`+arrows       | Move dashboard panel focus |
+| `Alt+Shift`+arrows | Move dashboard panel focus |
 | `z` / `Alt+Enter`  | Zoom focused panel (Esc to exit) |
 | `c` / `y`          | Clear / copy the SSH log   |
 | `/`                | Fuzzy filter (`Enter` keeps it for every host key, `/` refines, `Esc` clears) |

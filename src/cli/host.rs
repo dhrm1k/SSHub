@@ -376,6 +376,7 @@ fn cmd_add(ctx: &mut CliContext, args: &[String]) -> Result<i32> {
         session_logging: spec.session_logging,
         ping: spec.ping,
         transport: spec.transport,
+        legacy_ssh: spec.legacy_ssh,
     })?;
 
     ctx.store.set_host_groups(created.id, &group_ids)?;
@@ -493,6 +494,9 @@ fn cmd_edit(ctx: &mut CliContext, args: &[String]) -> Result<i32> {
         update.forward_agent = Some(None);
     } else if let Some(v) = patch.set_forward_agent {
         update.forward_agent = Some(Some(v));
+    }
+    if let Some(v) = patch.set_legacy_ssh {
+        update.legacy_ssh = Some(v);
     }
     if let Some(v) = patch.set_os_icon {
         update.os_icon = Some(v);
@@ -820,6 +824,7 @@ struct HostAddSpec {
     favorite: bool,
     password: Option<String>,
     secret_lookup: Option<String>,
+    legacy_ssh: bool,
 }
 
 impl HostAddSpec {
@@ -857,6 +862,7 @@ impl HostAddSpec {
         } else {
             None
         };
+        let legacy_ssh = parse::take_flag(&mut args, "--legacy-ssh");
         let remote_command =
             parse::take_opt(&mut args, "--remote-command").and_then(|s| optional_field(&s));
         let transport = parse::take_opt(&mut args, "--transport").and_then(|s| parse_transport(&s));
@@ -896,6 +902,7 @@ impl HostAddSpec {
             favorite,
             password,
             secret_lookup,
+            legacy_ssh,
         })
     }
 }
@@ -920,6 +927,7 @@ struct HostEditPatch {
     clear_remote_command: bool,
     set_forward_agent: Option<bool>,
     clear_forward_agent: bool,
+    set_legacy_ssh: Option<bool>,
     set_os_icon: Option<Option<String>>,
     clear_os_icon: bool,
     set_session_logging: Option<crate::session_log::SessionLoggingOverride>,
@@ -963,6 +971,7 @@ impl HostEditPatch {
             clear_remote_command: false,
             set_forward_agent: None,
             clear_forward_agent: false,
+            set_legacy_ssh: None,
             set_os_icon: None,
             clear_os_icon: false,
             set_session_logging: None,
@@ -1023,6 +1032,12 @@ impl HostEditPatch {
             patch.set_forward_agent = Some(false);
         }
         patch.clear_forward_agent = parse::take_flag(&mut args, "--clear-forward-agent");
+        if parse::take_flag(&mut args, "--set-legacy-ssh") {
+            patch.set_legacy_ssh = Some(true);
+        }
+        if parse::take_flag(&mut args, "--no-legacy-ssh") {
+            patch.set_legacy_ssh = Some(false);
+        }
         if let Some(v) = parse::take_opt(&mut args, "--set-os-icon") {
             patch.set_os_icon = Some(optional_field(&v));
         }
@@ -1092,6 +1107,7 @@ impl HostEditPatch {
             || self.clear_remote_command
             || self.set_forward_agent.is_some()
             || self.clear_forward_agent
+            || self.set_legacy_ssh.is_some()
             || self.set_os_icon.is_some()
             || self.clear_os_icon
             || self.set_session_logging.is_some()
@@ -1150,6 +1166,7 @@ impl HostEditPatch {
             || self.clear_proxy_jump
             || self.set_forward_agent.is_some()
             || self.clear_forward_agent
+            || self.set_legacy_ssh.is_some()
             || self.set_remote_command.is_some()
             || self.clear_remote_command
     }

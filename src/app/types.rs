@@ -1219,6 +1219,8 @@ pub struct HostFormEdit {
     pub proxy_jump: String,
     /// Explicit agent forwarding (`None` = inherit; Space cycles inherit → on → off).
     pub forward_agent: Option<bool>,
+    /// Append older OpenSSH algorithms on connect (Space toggles).
+    pub legacy_ssh: bool,
     pub remote_command: String,
     /// Explicit transport (`None` = inherit; Space cycles inherit → ssh → mosh).
     pub transport: Option<crate::session_transport::SessionTransport>,
@@ -1269,10 +1271,11 @@ pub enum HostFormField {
     Username = 14,
     Ping = 15,
     SecretLookup = 16,
+    LegacySsh = 17,
 }
 
 impl HostFormField {
-    pub const ALL: [HostFormField; 17] = [
+    pub const ALL: [HostFormField; 18] = [
         HostFormField::Address,
         HostFormField::Password,
         HostFormField::SecretLookup,
@@ -1285,6 +1288,7 @@ impl HostFormField {
         HostFormField::Tags,
         HostFormField::ProxyJump,
         HostFormField::ForwardAgent,
+        HostFormField::LegacySsh,
         HostFormField::RemoteCommand,
         HostFormField::Transport,
         HostFormField::SessionLogging,
@@ -1300,6 +1304,7 @@ impl HostFormField {
                 | HostFormField::Port
                 | HostFormField::ProxyJump
                 | HostFormField::ForwardAgent
+                | HostFormField::LegacySsh
                 | HostFormField::RemoteCommand
                 | HostFormField::OsIcon
         )
@@ -1326,6 +1331,7 @@ impl HostFormField {
             HostFormField::Tags => "Tags",
             HostFormField::ProxyJump => "ProxyJump",
             HostFormField::ForwardAgent => "Agent forward",
+            HostFormField::LegacySsh => "Legacy SSH algs",
             HostFormField::RemoteCommand => "Startup command",
             HostFormField::Transport => "Transport",
             HostFormField::SessionLogging => "Session log",
@@ -1345,7 +1351,12 @@ impl HostFormField {
     }
 
     pub(crate) fn is_toggle(self) -> bool {
-        matches!(self, HostFormField::ForwardAgent | HostFormField::Transport)
+        matches!(
+            self,
+            HostFormField::ForwardAgent
+                | HostFormField::Transport
+                | HostFormField::LegacySsh
+        )
     }
 
     pub(crate) fn is_tri_state(self) -> bool {
@@ -1878,6 +1889,7 @@ impl HostFormEdit {
             HostFormField::ProxyJump => &self.proxy_jump,
             HostFormField::RemoteCommand => &self.remote_command,
             HostFormField::ForwardAgent
+            | HostFormField::LegacySsh
             | HostFormField::Transport
             | HostFormField::SessionLogging
             | HostFormField::Ping => "",
@@ -1909,6 +1921,7 @@ impl HostFormEdit {
             | HostFormField::Identity
             | HostFormField::OsIcon
             | HostFormField::ForwardAgent
+            | HostFormField::LegacySsh
             | HostFormField::Transport
             | HostFormField::SessionLogging
             | HostFormField::Ping => None,

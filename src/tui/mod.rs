@@ -2397,8 +2397,9 @@ enum FormKind {
 /// Rows each form needs to show everything it draws, hint lines included.
 const fn form_rows_needed(kind: FormKind) -> u16 {
     match kind {
-        // 17 fields + a blank + 2 hint rows + 2 borders, plus the extra hint row
-        // the password field adds: exactly a 24-row terminal.
+        // Field panel (top + 18 rows + bottom) + 1 hint row + 2 outer borders.
+        // Fits a 24-row terminal with no spare margin — no scroll for the field
+        // list. The hop editor may still grow past this and scroll.
         FormKind::Host => 24,
         FormKind::Identity => 14,
         FormKind::Keygen => 14,
@@ -7027,9 +7028,16 @@ marker = { foreground = \"#ab0005\" }\n\
             );
 
             // Was: `Style::default()`. Now: `components.form.value`.
+            // Host form pads labels to a fixed 24-col column; identity still
+            // draws `Label: value` tightly.
             let (lx, ly) = crate::test_support::find_text(&buf, idle_label);
+            let value_x = if which == "host form" {
+                lx + 24
+            } else {
+                lx + idle_label.chars().count() as u16 + 1
+            };
             assert_eq!(
-                cell_style(&buf, lx + idle_label.chars().count() as u16 + 1, ly).fg,
+                cell_style(&buf, value_x, ly).fg,
                 Some(legacy::TEXT),
                 "{which}: an idle value takes the body-text role"
             );
@@ -7158,9 +7166,10 @@ marker = { foreground = \"#ab0005\" }\n\
         // The Label row is idle and never a placeholder, so its value carries
         // the plain value role. (Port shows a muted "inherited: …" and an
         // empty Name a muted "defaults to …" — see the help-role assertion below.)
+        // Labels are padded to a fixed 24-col column inside the field panel.
         let (px, py) = crate::test_support::find_text(&buf, "Label:");
         assert_eq!(
-            cell_style(&buf, px + 7, py).fg,
+            cell_style(&buf, px + 24, py).fg,
             Some(marker(0xa50004)),
             "an idle value is components.form.value"
         );
@@ -7171,10 +7180,10 @@ marker = { foreground = \"#ab0005\" }\n\
             Some(marker(0xa50008)),
             "an inherited placeholder is components.form.help"
         );
-        // The focused row's value has its own role.
+        // The focused row's value has its own role (24-col padded label).
         let (ax, ay) = crate::test_support::find_text(&buf, "Address:");
         assert_eq!(
-            cell_style(&buf, ax + 9, ay).fg,
+            cell_style(&buf, ax + 24, ay).fg,
             Some(marker(0xa50006)),
             "the current value is components.form.input_focused"
         );

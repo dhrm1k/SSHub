@@ -55,6 +55,8 @@ vendored = ["ssh2/vendored-openssl"]
 
 [dependencies]
 anyhow = "1"
+# System clipboard read for right-click paste (OSC 52 only covers writes).
+arboard = "3"
 crossterm = "0.29"
 # Enable real OS backends. Without a backend feature, keyring 3.x silently
 # falls back to an in-memory mock store: set()/get() work within one process
