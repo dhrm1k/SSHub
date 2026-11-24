@@ -226,11 +226,7 @@ pub fn render_host_form(
                             form.cursor,
                         )
                     } else {
-                        password_display(
-                            &form.password,
-                            form.has_password,
-                            form.password_revealed,
-                        )
+                        password_display(&form.password, form.has_password, form.password_revealed)
                     };
                     if active && !secret_hints.is_empty() {
                         format!("{body}    {secret_hints}")
@@ -301,8 +297,7 @@ pub fn render_host_form(
         // the value stays the last span (click-to-cursor) and editing underline
         // does not paint the border; top/bottom caps still close the panel.
         let value_cols = box_w.saturating_sub(2 + 2 + LABEL_COLS).max(4);
-        let label_text =
-            crate::tui::text::pad_ellipsize(&format!("{label}{suffix}:"), LABEL_COLS);
+        let label_text = crate::tui::text::pad_ellipsize(&format!("{label}{suffix}:"), LABEL_COLS);
         let value_text = crate::tui::text::pad_ellipsize(&display, value_cols);
         lines.push((
             Line::from(vec![
@@ -327,12 +322,8 @@ pub fn render_host_form(
     // Single hint row under the panel (no blank spacer) so the +2 panel caps
     // stay within the non-scrollable 24-row budget.
     let save = format!("{save_hint}: save");
-    let mut hint_parts: Vec<&str> = vec![
-        "Tab/↓ next",
-        "Enter picker",
-        "Ctrl+U/W kill",
-        save.as_str(),
-    ];
+    let mut hint_parts: Vec<&str> =
+        vec!["Tab/↓ next", "Enter picker", "Ctrl+U/W kill", save.as_str()];
     if !copy_hint.is_empty() {
         hint_parts.push(copy_hint);
     }
@@ -541,10 +532,7 @@ mod tests {
     #[test]
     fn field_panel_draws_a_shared_box() {
         let text = rendered_text(&empty_form(), &inherited_all_set());
-        assert!(
-            text.contains("fields"),
-            "panel title missing:\n{text}"
-        );
+        assert!(text.contains("fields"), "panel title missing:\n{text}");
         assert!(
             text.contains('\u{250c}') && text.contains('\u{2514}'),
             "panel corners missing:\n{text}"

@@ -556,16 +556,8 @@ impl Default for KeybindsConfig {
             session_close_tab: vec!["Ctrl+W".into()],
             // Alt+Left/Right match Termius-style session-tab cycling; panel
             // focus uses Alt+Shift+arrows so the chords do not collide.
-            session_tab_prev: vec![
-                "Ctrl+[".into(),
-                "Ctrl+PageUp".into(),
-                "Alt+Left".into(),
-            ],
-            session_tab_next: vec![
-                "Ctrl+]".into(),
-                "Ctrl+PageDown".into(),
-                "Alt+Right".into(),
-            ],
+            session_tab_prev: vec!["Ctrl+[".into(), "Ctrl+PageUp".into(), "Alt+Left".into()],
+            session_tab_next: vec!["Ctrl+]".into(), "Ctrl+PageDown".into(), "Alt+Right".into()],
             session_detach: vec!["Ctrl+D".into()],
             // Alt+Shift+letter: every Alt+letter that no shell binds is taken by
             // the split view, and remote apps (readline, tmux, vim) leave the

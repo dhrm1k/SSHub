@@ -855,9 +855,7 @@ fn migrate_v21_to_v22(conn: &Connection) -> Result<()> {
         .prepare("SELECT COUNT(*) FROM pragma_table_info('hosts') WHERE name = 'legacy_ssh'")?
         .query_row([], |row| row.get(0))?;
     if has == 0 {
-        conn.execute_batch(
-            "ALTER TABLE hosts ADD COLUMN legacy_ssh INTEGER NOT NULL DEFAULT 0;",
-        )?;
+        conn.execute_batch("ALTER TABLE hosts ADD COLUMN legacy_ssh INTEGER NOT NULL DEFAULT 0;")?;
     }
     Ok(())
 }
@@ -1394,11 +1392,9 @@ INSERT INTO host_groups (name, sort_order, reserved, created_at)
             .collect();
         assert_eq!(snapshots.len(), 1, "{snapshots:?}");
         let legacy: i64 = migrated
-            .query_row(
-                "SELECT legacy_ssh FROM hosts WHERE name = 'a'",
-                [],
-                |r| r.get(0),
-            )
+            .query_row("SELECT legacy_ssh FROM hosts WHERE name = 'a'", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(legacy, 0);
     }

@@ -66,10 +66,7 @@ pub fn inject_mosh_ssh_compat(mut argv: Vec<String>) -> Vec<String> {
         return argv;
     }
     if argv.len() >= 2 {
-        argv.insert(
-            1,
-            format!("--ssh={}", mosh_ssh_command_with_compat(None)),
-        );
+        argv.insert(1, format!("--ssh={}", mosh_ssh_command_with_compat(None)));
     }
     argv
 }
@@ -84,7 +81,9 @@ mod tests {
         splice_ssh_compat_options(&mut argv);
         assert_eq!(argv[0], "ssh");
         assert!(argv.iter().any(|a| a == "HostKeyAlgorithms=+ssh-rsa"));
-        assert!(argv.iter().any(|a| a == "PubkeyAcceptedAlgorithms=+ssh-rsa"));
+        assert!(argv
+            .iter()
+            .any(|a| a == "PubkeyAcceptedAlgorithms=+ssh-rsa"));
         assert!(argv
             .iter()
             .any(|a| a == "KexAlgorithms=+diffie-hellman-group14-sha1"));
@@ -118,11 +117,8 @@ mod tests {
 
     #[test]
     fn mosh_inject_extends_existing_ssh() {
-        let argv = inject_mosh_ssh_compat(vec![
-            "mosh".into(),
-            "--ssh=ssh -p 2222".into(),
-            "h".into(),
-        ]);
+        let argv =
+            inject_mosh_ssh_compat(vec!["mosh".into(), "--ssh=ssh -p 2222".into(), "h".into()]);
         assert!(argv[1].starts_with("--ssh=ssh -p 2222 "));
         assert!(argv[1].contains("HostKeyAlgorithms=+ssh-rsa"));
     }

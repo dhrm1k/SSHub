@@ -322,9 +322,9 @@ mod tests {
         assert!(argv
             .windows(2)
             .any(|w| w == ["-o", "PubkeyAcceptedAlgorithms=+ssh-rsa"]));
-        assert!(argv.windows(2).any(|w| {
-            w == ["-o", "KexAlgorithms=+diffie-hellman-group14-sha1"]
-        }));
+        assert!(argv
+            .windows(2)
+            .any(|w| { w == ["-o", "KexAlgorithms=+diffie-hellman-group14-sha1"] }));
         assert_eq!(argv.last().map(String::as_str), Some("192.0.2.1"));
     }
 

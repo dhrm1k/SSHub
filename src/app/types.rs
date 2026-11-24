@@ -1353,9 +1353,7 @@ impl HostFormField {
     pub(crate) fn is_toggle(self) -> bool {
         matches!(
             self,
-            HostFormField::ForwardAgent
-                | HostFormField::Transport
-                | HostFormField::LegacySsh
+            HostFormField::ForwardAgent | HostFormField::Transport | HostFormField::LegacySsh
         )
     }
 
